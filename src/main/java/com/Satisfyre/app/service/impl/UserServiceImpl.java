@@ -1,0 +1,316 @@
+package com.Satisfyre.app.service.impl;
+
+import com.Satisfyre.app.dto.LoginRequest;
+import com.Satisfyre.app.dto.RegistrationRequest;
+import com.Satisfyre.app.exceptions.InvalidCredentialException;
+import com.Satisfyre.app.exceptions.NotFoundException;
+import com.Satisfyre.app.notification.NotificationService;
+import com.Satisfyre.app.service.UserService;
+import com.Satisfyre.app.dto.Response;
+import com.Satisfyre.app.dto.UserDTO;
+import com.Satisfyre.app.entity.UserEntity;
+import com.Satisfyre.app.entity.VerificationTokenEntity;
+import com.Satisfyre.app.enums.UserRole;
+import com.Satisfyre.app.repo.UserRepository;
+import com.Satisfyre.app.security.JwtUtils;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.modelmapper.ModelMapper;
+import org.modelmapper.TypeToken;
+import com.Satisfyre.app.repo.verificationTokenRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class UserServiceImpl implements UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtils jwtUtils;
+    private final ModelMapper modelMapper;
+    private final NotificationService notificationService;
+    @Autowired
+    private final verificationTokenRepository verificationTokenRepository;
+
+
+    @Override
+    public Response registerUser(RegistrationRequest registrationRequest) {
+
+        log.info("INSIDE registerUser()");
+
+        UserRole role = registrationRequest.getRole() != null ? registrationRequest.getRole() : UserRole.CUSTOMER;
+
+
+        if (userRepository.existsByEmail(registrationRequest.getEmail())) {
+            throw new IllegalArgumentException("Email already exists: " + registrationRequest.getEmail());
+        }
+
+        UserEntity userToSave = UserEntity.builder()
+                .firstName(registrationRequest.getFirstName())
+                .lastName(registrationRequest.getLastName())
+                .email(registrationRequest.getEmail())
+                .password(passwordEncoder.encode(registrationRequest.getPassword()))
+                .phoneNumber(registrationRequest.getPhoneNumber())
+                .role(role)
+                .active(false) // set to false until verification
+                .build();
+
+        // Generate unique referral code
+        userToSave.setReferralCode(generateReferralCode(registrationRequest.getFirstName()));
+
+        if (registrationRequest.getReferredBy() != null) {
+            Optional<UserEntity> upline = userRepository.findByReferralCode(registrationRequest.getReferredBy());
+            if (upline.isPresent()) {
+                userToSave.setReferredBy(upline.get().getReferralCode());
+            } else {
+                throw new IllegalArgumentException("Invalid referral code");
+            }
+        }
+        userRepository.save(userToSave);
+
+
+        // Generate verification token
+        String token = UUID.randomUUID().toString();
+        VerificationTokenEntity verificationToken = VerificationTokenEntity.builder()
+                .token(token)
+                .user(userToSave)
+                .expiryDate(LocalDateTime.now().plusMinutes(5))
+                .build();
+
+        verificationTokenRepository.save(verificationToken);
+
+        // Build verification link
+        String verificationLink = "http://localhost:8080/api/auth/verify?token=" + token;
+
+        // Send email
+        notificationService.sendVerificationEmail(
+                userToSave.getEmail(),
+                userToSave.getFirstName(),
+                verificationLink
+        );
+
+        return Response.builder()
+                .status(200)
+                .token(token)
+                .referralCode(userToSave.getReferralCode())
+                .message(registrationRequest.getEmail() + " Registered successfully. Please verify your email.")
+                .build();
+    }
+
+    @Override
+    public Response verifyToken(String token) {
+        Optional<VerificationTokenEntity> optionalToken = verificationTokenRepository.findByToken(token);
+
+        if (optionalToken.isEmpty()) {
+            return Response.builder()
+                    .status(400)
+                    .message("Invalid verification token.")
+                    .build();
+        }
+
+        VerificationTokenEntity verificationToken = optionalToken.get();
+
+        if (verificationToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+            return Response.builder()
+                    .status(400)
+                    .message("Verification token has expired.")
+                    .build();
+        }
+
+        UserEntity user = verificationToken.getUser();
+        user.setActive(true);
+        userRepository.save(user);
+
+        return Response.builder()
+                .status(200)
+                .message("Your account has been verified successfully.")
+                .build();
+    }
+
+
+    @Override
+    public Response loginUser(LoginRequest loginRequest) {
+
+        log.info("INSIDE loginUser() " + loginRequest.getEmail());
+
+        UserEntity user = userRepository.findByEmail(loginRequest.getEmail())
+                .orElseThrow(() -> new NotFoundException("Email Not Found"));
+
+        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
+            throw new InvalidCredentialException("Password does not match");
+        }
+
+        String token = jwtUtils.generateToken(user.getEmail());
+
+        return Response.builder()
+                .status(200)
+                .message("user logged in successfully")
+                .role(user.getRole())
+                .token(token)
+                .active(user.isActive())
+                .expirationTime("6 month")
+                .build();
+
+    }
+
+    @Override
+    public Response getAllUsers() {
+
+        log.info("INSIDE getAllUsers()");
+
+        List<UserEntity> users = userRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
+
+        List<UserDTO> userDTOList = modelMapper.map(users, new TypeToken<List<UserDTO>>() {
+        }.getType());
+
+        return Response.builder()
+                .status(200)
+                .message("success")
+                .users(userDTOList)
+                .build();
+
+    }
+
+    @Override
+    public Response getOwnAccountDetails() {
+
+        log.info("INSIDE getOwnAccountDetails()");
+
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        UserEntity user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException("user not found"));
+
+        UserDTO userDTO = modelMapper.map(user, UserDTO.class);
+
+        return Response.builder()
+                .status(200)
+                .message("success")
+                .user(userDTO)
+                .build();
+    }
+
+    @Override
+    public UserEntity getCurrentLoggedInUser() {
+
+        log.info("INSIDE getCurrentLoggedInUser()");
+
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException("user not found"));
+    }
+
+    @Override
+    public Response updateOwnAccount(UserDTO userDTO) {
+
+        log.info("INSIDE updateOwnAccount()");
+        UserEntity existingUser = getCurrentLoggedInUser();
+
+        if (userDTO.getEmail() != null) existingUser.setEmail(userDTO.getEmail());
+        if (userDTO.getFirstName() != null) existingUser.setFirstName(userDTO.getFirstName());
+        if (userDTO.getLastName() != null) existingUser.setLastName(userDTO.getLastName());
+        if (userDTO.getPhoneNumber() != null) existingUser.setPhoneNumber(userDTO.getPhoneNumber());
+
+        if (userDTO.getPassword() != null && !userDTO.getPassword().isEmpty()) {
+            existingUser.setPassword(passwordEncoder.encode(userDTO.getPassword()));
+        }
+
+        userRepository.save(existingUser);
+
+        return Response.builder()
+                .status(200)
+                .message("User Updated Successfully")
+                .build();
+
+    }
+
+    @Override
+    public Response deleteOwnAccount() {
+
+        log.info("INSIDE deleteOwnAccount()");
+
+        UserEntity currentUser = getCurrentLoggedInUser();
+
+        userRepository.delete(currentUser);
+
+        return Response.builder()
+                .status(200)
+                .message("User Deleted Successfully")
+                .build();
+    }
+
+    private String generateReferralCode(String name) {
+        return name.substring(0, 3).toUpperCase() + UUID.randomUUID().toString().substring(0, 5).toUpperCase();
+    }
+
+    @Override
+    public List<UserEntity> getDirectDownlines(String referralCode) {
+        return userRepository.findAllByReferredBy(referralCode);
+    }
+
+    @Override
+    public List<UserEntity> getAllDownlines(String referralCode) {
+        List<UserEntity> all = new ArrayList<>();
+        Queue<String> queue = new LinkedList<>();
+        queue.add(referralCode);
+
+        while (!queue.isEmpty()) {
+            String current = queue.poll();
+            List<UserEntity> downlines = userRepository.findAllByReferredBy(current);
+            all.addAll(downlines);
+            downlines.forEach(u -> queue.add(u.getReferralCode()));
+        }
+
+        return all;
+    }
+
+    @Override
+    public Response getMyBookingHistory() {
+        return null;
+    }
+
+
+    @Override
+    public Response getUserById(Long id) {
+        Optional<UserEntity> optionalUser = userRepository.findById(id);
+
+        if (optionalUser.isPresent()) {
+            UserEntity user = optionalUser.get();
+            UserDTO userDTO = UserDTO.fromEntity(user);
+
+            // Find downlines
+            List<UserEntity> downlineEntities = userRepository.findAllByReferredBy(user.getReferralCode());
+            List<UserDTO> downlines = downlineEntities.stream()
+                    .map(UserDTO::fromEntity)
+                    .collect(Collectors.toList());
+
+            return Response.builder()
+                    .status(200)
+                    .message("User retrieved successfully")
+                    .user(userDTO)        // main user
+                    .downlines(downlines)     // downlines
+                    .referralCode(user.getReferralCode()) // optional: if you added this field in Response
+                    .build();
+        } else {
+            return Response.builder()
+                    .status(404)
+                    .message("User not found")
+                    .build();
+        }
+    }
+
+
+
+
+
+}
