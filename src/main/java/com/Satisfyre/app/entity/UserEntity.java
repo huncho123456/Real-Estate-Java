@@ -1,6 +1,10 @@
 package com.Satisfyre.app.entity;
 
+import com.Satisfyre.app.enums.EmploymentStatus;
+import com.Satisfyre.app.enums.Gender;
+import com.Satisfyre.app.enums.MartialStatus;
 import com.Satisfyre.app.enums.UserRole;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -17,7 +21,6 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @Builder
 public class UserEntity {
-
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
@@ -28,10 +31,14 @@ public class UserEntity {
 
     @NotBlank(message = "Password is required")
     private String password;
+
+    @NotBlank(message = "First name is required")
     private String firstName;
+
+    @NotBlank(message = "First name is required")
     private String lastName;
 
-    @NotBlank(message = "phoneNumber is required")
+    @NotBlank(message = "Phone number is required")
     @Column(name = "phone_number")
     private String phoneNumber;
 
@@ -44,8 +51,44 @@ public class UserEntity {
     @Column(name = "referred_by")
     private String referredBy;
 
+    @Column(name = "active")
     private boolean active = false;
 
-    private final LocalDate createdAt = LocalDate.now();
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate dateOfBirth;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sex")
+    private Gender sex;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "martial_status")
+    private MartialStatus maritalStatus;
+
+    @Column(name = "home_address")
+    private String homeAddress;
+
+    @Column(name = "bank_name")
+    private String bankName;
+
+    @NotBlank(message = "Account name is required")
+    @Column(name = "account_number")
+    private String accountNumber;
+
+    @NotBlank(message = "Account name is required")
+    @Column(name = "account_name")
+    private String accountName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "employment_status")
+    private EmploymentStatus employmentStatus;
+
+    @Column(updatable = false)
+    private LocalDate createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDate.now();
+    }
 
 }

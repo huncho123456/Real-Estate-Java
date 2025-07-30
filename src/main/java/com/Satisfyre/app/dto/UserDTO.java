@@ -21,34 +21,33 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class UserDTO {
-
     private Long id;
-
     private String email;
-
-    @JsonIgnore
-    private String password;
     private String firstName;
     private String lastName;
-
     private String phoneNumber;
-
-    private UserRole role;
-
-    private String referredBy;
-
+    private String password;
+    private String role;
     private boolean active;
 
-    //user data
-    private UserDTO upline;
-    private List<UserDTO> users;
-
-    //downlines
     private String referralCode;
-    private List<UserDTO> downlines;
+    private String referredBy;
 
+    private LocalDate dateOfBirth;
+    private String sex;
+    private String maritalStatus;
+    private String homeAddress;
+    private String bankName;
+    private String accountNumber;
+    private String accountName;
+    private String employmentStatus;
 
-    private LocalDate createdAt;
+    private int status;
+    private String message;
+
+    private UserDTO user;
+    private List<UserDTO> users;       // list of downlines
+
 
     public static UserDTO fromEntity(UserEntity user) {
         return UserDTO.builder()
@@ -57,13 +56,20 @@ public class UserDTO {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .phoneNumber(user.getPhoneNumber())
-                .role(user.getRole())
+                .role(user.getRole() != null ? user.getRole().name() : null)
                 .active(user.isActive())
                 .referralCode(user.getReferralCode())
                 .referredBy(user.getReferredBy())
+                .dateOfBirth(user.getDateOfBirth())
+                .sex(String.valueOf(user.getSex()))
+                .maritalStatus(String.valueOf(user.getMaritalStatus()))
+                .homeAddress(user.getHomeAddress())
+                .bankName(user.getBankName())
+                .accountNumber(user.getAccountNumber())
+                .accountName(user.getAccountName())
+                .employmentStatus(String.valueOf(user.getEmploymentStatus()))
                 .build();
     }
-
 }
 
 

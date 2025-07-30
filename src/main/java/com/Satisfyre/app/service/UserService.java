@@ -23,6 +23,7 @@ public interface UserService {
     List<UserEntity> getAllDownlines(String referralCode);
     Response getMyBookingHistory();
     Response getUserById (Long id);
+    public String getUplineNameByReferralCode(String referralCode);
 
 
 }

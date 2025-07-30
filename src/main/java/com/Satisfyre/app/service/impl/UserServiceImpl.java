@@ -2,6 +2,9 @@ package com.Satisfyre.app.service.impl;
 
 import com.Satisfyre.app.dto.LoginRequest;
 import com.Satisfyre.app.dto.RegistrationRequest;
+import com.Satisfyre.app.enums.EmploymentStatus;
+import com.Satisfyre.app.enums.Gender;
+import com.Satisfyre.app.enums.MartialStatus;
 import com.Satisfyre.app.exceptions.InvalidCredentialException;
 import com.Satisfyre.app.exceptions.NotFoundException;
 import com.Satisfyre.app.notification.NotificationService;
@@ -24,6 +27,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -44,11 +48,9 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Response registerUser(RegistrationRequest registrationRequest) {
-
         log.info("INSIDE registerUser()");
 
         UserRole role = registrationRequest.getRole() != null ? registrationRequest.getRole() : UserRole.CUSTOMER;
-
 
         if (userRepository.existsByEmail(registrationRequest.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + registrationRequest.getEmail());
@@ -61,24 +63,27 @@ public class UserServiceImpl implements UserService {
                 .password(passwordEncoder.encode(registrationRequest.getPassword()))
                 .phoneNumber(registrationRequest.getPhoneNumber())
                 .role(role)
-                .active(false) // set to false until verification
+                .active(false)
+                .dateOfBirth(registrationRequest.getDateOfBirth())
+                .sex(Gender.valueOf(registrationRequest.getSex()))
+                .maritalStatus(MartialStatus.valueOf(registrationRequest.getMaritalStatus()))
+                .homeAddress(registrationRequest.getHomeAddress())
+                .bankName(registrationRequest.getBankName())
+                .accountNumber(registrationRequest.getAccountNumber())
+                .accountName(registrationRequest.getAccountName())
+                .employmentStatus(EmploymentStatus.valueOf(registrationRequest.getEmploymentStatus()))
                 .build();
 
-        // Generate unique referral code
         userToSave.setReferralCode(generateReferralCode(registrationRequest.getFirstName()));
 
         if (registrationRequest.getReferredBy() != null) {
             Optional<UserEntity> upline = userRepository.findByReferralCode(registrationRequest.getReferredBy());
-            if (upline.isPresent()) {
-                userToSave.setReferredBy(upline.get().getReferralCode());
-            } else {
-                throw new IllegalArgumentException("Invalid referral code");
-            }
+            upline.ifPresent(user -> userToSave.setReferredBy(user.getReferralCode()));
         }
+
+
         userRepository.save(userToSave);
 
-
-        // Generate verification token
         String token = UUID.randomUUID().toString();
         VerificationTokenEntity verificationToken = VerificationTokenEntity.builder()
                 .token(token)
@@ -88,10 +93,8 @@ public class UserServiceImpl implements UserService {
 
         verificationTokenRepository.save(verificationToken);
 
-        // Build verification link
         String verificationLink = "http://localhost:8080/api/auth/verify?token=" + token;
 
-        // Send email
         notificationService.sendVerificationEmail(
                 userToSave.getEmail(),
                 userToSave.getFirstName(),
@@ -105,6 +108,13 @@ public class UserServiceImpl implements UserService {
                 .message(registrationRequest.getEmail() + " Registered successfully. Please verify your email.")
                 .build();
     }
+
+    public String getUplineNameByReferralCode(String referralCode) {
+        return userRepository.findByReferralCode(referralCode)
+                .map(user -> user.getFirstName() + " " + user.getLastName())
+                .orElseThrow(() -> new IllegalArgumentException("Referral code not found: " + referralCode));
+    }
+
 
     @Override
     public Response verifyToken(String token) {

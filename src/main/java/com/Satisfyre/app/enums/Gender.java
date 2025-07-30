@@ -1,2 +1,5 @@
-package com.Satisfyre.app.enums;public enum Gender {
+package com.Satisfyre.app.enums;
+
+public enum Gender {
+    MALE, FEMALE, OTHER
 }

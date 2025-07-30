@@ -61,5 +61,11 @@ public class UserController {
         }
     }
 
+    @GetMapping("/upline-name/{referralCode}")
+    public ResponseEntity<String> getUplineName(@PathVariable String referralCode) {
+        String fullName = userService.getUplineNameByReferralCode(referralCode);
+        return ResponseEntity.ok(fullName);
+    }
+
 
 }

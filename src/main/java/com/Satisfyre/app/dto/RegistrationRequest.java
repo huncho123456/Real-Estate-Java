@@ -5,6 +5,9 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDate;
 
 @Data
 @AllArgsConstructor
@@ -29,4 +32,14 @@ public class RegistrationRequest {
 
     @NotBlank(message = "Password is required")
     private String password;
+
+    private LocalDate dateOfBirth;
+    private String sex;
+    private String maritalStatus;
+    private String homeAddress;
+    private String bankName;
+    private String accountNumber;
+    private String accountName;
+    private String employmentStatus;
+    private MultipartFile idProof;
 }
