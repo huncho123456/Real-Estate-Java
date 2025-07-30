@@ -1,4 +1,4 @@
-ocument.getElementById("formAuthentication").addEventListener("submit", async function (e) {
+document.getElementById("formAuthentication").addEventListener("submit", async function (e) {
   e.preventDefault();
 
   const email = document.getElementById("email").value.trim();
@@ -59,7 +59,7 @@ return data.token;
 
     // Optional: redirect after 2 seconds
     setTimeout(() => {
-      window.location.href = "dashboard.html"; // change as needed
+     window.location.assign("index.html");
     }, 2000);
 
   } catch (error) {
