@@ -2,9 +2,6 @@ package com.Satisfyre.app.service.impl;
 
 import com.Satisfyre.app.dto.LoginRequest;
 import com.Satisfyre.app.dto.RegistrationRequest;
-import com.Satisfyre.app.enums.EmploymentStatus;
-import com.Satisfyre.app.enums.Gender;
-import com.Satisfyre.app.enums.MartialStatus;
 import com.Satisfyre.app.exceptions.InvalidCredentialException;
 import com.Satisfyre.app.exceptions.NotFoundException;
 import com.Satisfyre.app.notification.NotificationService;
@@ -27,7 +24,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -65,13 +61,13 @@ public class UserServiceImpl implements UserService {
                 .role(role)
                 .active(false)
                 .dateOfBirth(registrationRequest.getDateOfBirth())
-                .sex(Gender.valueOf(registrationRequest.getSex()))
-                .maritalStatus(MartialStatus.valueOf(registrationRequest.getMaritalStatus()))
+                .sex(registrationRequest.getSex())
+                .maritalStatus(registrationRequest.getMaritalStatus())
                 .homeAddress(registrationRequest.getHomeAddress())
                 .bankName(registrationRequest.getBankName())
                 .accountNumber(registrationRequest.getAccountNumber())
                 .accountName(registrationRequest.getAccountName())
-                .employmentStatus(EmploymentStatus.valueOf(registrationRequest.getEmploymentStatus()))
+                .employmentStatus(registrationRequest.getEmploymentStatus())
                 .build();
 
         userToSave.setReferralCode(generateReferralCode(registrationRequest.getFirstName()));

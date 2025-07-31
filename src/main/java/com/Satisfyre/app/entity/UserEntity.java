@@ -1,8 +1,5 @@
 package com.Satisfyre.app.entity;
 
-import com.Satisfyre.app.enums.EmploymentStatus;
-import com.Satisfyre.app.enums.Gender;
-import com.Satisfyre.app.enums.MartialStatus;
 import com.Satisfyre.app.enums.UserRole;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
@@ -57,13 +54,11 @@ public class UserEntity {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate dateOfBirth;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "sex")
-    private Gender sex;
+    private String sex;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "martial_status")
-    private MartialStatus maritalStatus;
+    private String maritalStatus;
 
     @Column(name = "home_address")
     private String homeAddress;
@@ -79,9 +74,8 @@ public class UserEntity {
     @Column(name = "account_name")
     private String accountName;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "employment_status")
-    private EmploymentStatus employmentStatus;
+    private String employmentStatus;
 
     @Column(updatable = false)
     private LocalDate createdAt;
