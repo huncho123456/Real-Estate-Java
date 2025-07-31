@@ -1,5 +1,6 @@
 package com.Satisfyre.app.service.impl;
 
+import com.Satisfyre.app.config.dotenvConfig;
 import com.Satisfyre.app.dto.LoginRequest;
 import com.Satisfyre.app.dto.RegistrationRequest;
 import com.Satisfyre.app.exceptions.InvalidCredentialException;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class UserServiceImpl implements UserService {
 
+    String BASEURL = dotenvConfig.get("BASEURL");
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
@@ -89,7 +91,8 @@ public class UserServiceImpl implements UserService {
 
         verificationTokenRepository.save(verificationToken);
 
-        String verificationLink = "http://localhost:8080/api/auth/verify?token=" + token;
+        String verificationLink = BASEURL+"/api/auth/verify?token=" + token;
+        System.out.println(verificationLink);
 
         notificationService.sendVerificationEmail(
                 userToSave.getEmail(),

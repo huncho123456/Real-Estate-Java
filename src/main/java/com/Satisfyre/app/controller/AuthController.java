@@ -1,6 +1,7 @@
 package com.Satisfyre.app.controller;
 
 
+import com.Satisfyre.app.config.dotenvConfig;
 import com.Satisfyre.app.dto.LoginRequest;
 import com.Satisfyre.app.dto.RegistrationRequest;
 import com.Satisfyre.app.dto.Response;
@@ -14,7 +15,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-
 @RestController
 @RequiredArgsConstructor
 @CrossOrigin(origins = "http://127.0.0.1:5500")
@@ -22,9 +22,10 @@ import java.util.Map;
 public class AuthController {
 
     private final UserService userService;
+    String BASEURL = dotenvConfig.get("BASEURL");
 
     @PostMapping("/register")
-    public ResponseEntity<Response> registerUser(@ModelAttribute @Valid RegistrationRequest request){
+    public ResponseEntity<Response> registerUser(@RequestBody @Valid RegistrationRequest request){
         return ResponseEntity.ok(userService.registerUser(request));
     }
     @PostMapping("/login")
@@ -38,7 +39,7 @@ public class AuthController {
 
     @GetMapping("/me/referral-link")
     public ResponseEntity<Map<String, String>> getReferralLink(@AuthenticationPrincipal UserEntity user) {
-        String referralLink = "https://localhost/register?ref=" + user.getReferralCode();
+        String referralLink = BASEURL +"/register?ref=" + user.getReferralCode();
         return ResponseEntity.ok(Map.of(
                 "referralCode", user.getReferralCode(),
                 "referralLink", referralLink
