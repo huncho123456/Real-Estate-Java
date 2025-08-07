@@ -18,12 +18,12 @@ public interface UserService {
     UserEntity getCurrentLoggedInUser();
     Response updateOwnAccount(UserDTO userDTO);
     Response deleteOwnAccount();
-    Response verifyToken(String token);
     List<UserEntity> getDirectDownlines(String referralCode);
     List<UserEntity> getAllDownlines(String referralCode);
     Response getMyBookingHistory();
     Response getUserById (Long id);
     public String getUplineNameByReferralCode(String referralCode);
+
 
 
 }

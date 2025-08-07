@@ -10,7 +10,6 @@ import com.Satisfyre.app.service.UserService;
 import com.Satisfyre.app.dto.Response;
 import com.Satisfyre.app.dto.UserDTO;
 import com.Satisfyre.app.entity.UserEntity;
-import com.Satisfyre.app.entity.VerificationTokenEntity;
 import com.Satisfyre.app.enums.UserRole;
 import com.Satisfyre.app.repo.UserRepository;
 import com.Satisfyre.app.security.JwtUtils;
@@ -18,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
-import com.Satisfyre.app.repo.verificationTokenRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -40,28 +38,27 @@ public class UserServiceImpl implements UserService {
     private final JwtUtils jwtUtils;
     private final ModelMapper modelMapper;
     private final NotificationService notificationService;
-    @Autowired
-    private final verificationTokenRepository verificationTokenRepository;
-
 
     @Override
     public Response registerUser(RegistrationRequest registrationRequest) {
         log.info("INSIDE registerUser()");
 
-        UserRole role = registrationRequest.getRole() != null ? registrationRequest.getRole() : UserRole.CUSTOMER;
-
         if (userRepository.existsByEmail(registrationRequest.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + registrationRequest.getEmail());
         }
 
+        UserRole role = registrationRequest.getRole() != null ? registrationRequest.getRole() : UserRole.CUSTOMER;
+
+        // Hash the password for storage
+        String hashedPassword = passwordEncoder.encode(registrationRequest.getPassword());
         UserEntity userToSave = UserEntity.builder()
                 .firstName(registrationRequest.getFirstName())
                 .lastName(registrationRequest.getLastName())
                 .email(registrationRequest.getEmail())
-                .password(passwordEncoder.encode(registrationRequest.getPassword()))
+                .password(hashedPassword)
                 .phoneNumber(registrationRequest.getPhoneNumber())
                 .role(role)
-                .active(false)
+                .active(true)
                 .dateOfBirth(registrationRequest.getDateOfBirth())
                 .sex(registrationRequest.getSex())
                 .maritalStatus(registrationRequest.getMaritalStatus())
@@ -72,77 +69,45 @@ public class UserServiceImpl implements UserService {
                 .employmentStatus(registrationRequest.getEmploymentStatus())
                 .build();
 
+        // Generate and set referral code
         userToSave.setReferralCode(generateReferralCode(registrationRequest.getFirstName()));
 
+        // Optionally set the upline referral if present and valid
         if (registrationRequest.getReferredBy() != null) {
             Optional<UserEntity> upline = userRepository.findByReferralCode(registrationRequest.getReferredBy());
             upline.ifPresent(user -> userToSave.setReferredBy(user.getReferralCode()));
+
         }
 
+        // Save user
+        UserEntity saved = userRepository.save(userToSave);
 
-        userRepository.save(userToSave);
+        UserDTO userDTO = modelMapper.map(saved, UserDTO.class);
 
-        String token = UUID.randomUUID().toString();
-        VerificationTokenEntity verificationToken = VerificationTokenEntity.builder()
-                .token(token)
-                .user(userToSave)
-                .expiryDate(LocalDateTime.now().plusMinutes(5))
-                .build();
+        notificationService.sendWelcomeEmail(
+                saved.getEmail(),
+                saved.getFirstName() + " " + saved.getLastName(),
+                saved.getEmail(),
+                registrationRequest.getPassword(),
+                saved.getPhoneNumber(),
+                saved.getReferralCode()
 
-        verificationTokenRepository.save(verificationToken);
-
-        String verificationLink = BASEURL+"/api/auth/verify?token=" + token;
-        System.out.println(verificationLink);
-
-        notificationService.sendVerificationEmail(
-                userToSave.getEmail(),
-                userToSave.getFirstName(),
-                verificationLink
         );
 
         return Response.builder()
                 .status(200)
-                .token(token)
-                .referralCode(userToSave.getReferralCode())
-                .message(registrationRequest.getEmail() + " Registered successfully. Please verify your email.")
+                .referralCode(saved.getReferralCode())
+                .password(registrationRequest.getPassword())
+                .user(userDTO)
+                .message(saved.getEmail() + " Registered successfully. Check your email.")
                 .build();
     }
+
 
     public String getUplineNameByReferralCode(String referralCode) {
         return userRepository.findByReferralCode(referralCode)
                 .map(user -> user.getFirstName() + " " + user.getLastName())
                 .orElseThrow(() -> new IllegalArgumentException("Referral code not found: " + referralCode));
-    }
-
-
-    @Override
-    public Response verifyToken(String token) {
-        Optional<VerificationTokenEntity> optionalToken = verificationTokenRepository.findByToken(token);
-
-        if (optionalToken.isEmpty()) {
-            return Response.builder()
-                    .status(400)
-                    .message("Invalid verification token.")
-                    .build();
-        }
-
-        VerificationTokenEntity verificationToken = optionalToken.get();
-
-        if (verificationToken.getExpiryDate().isBefore(LocalDateTime.now())) {
-            return Response.builder()
-                    .status(400)
-                    .message("Verification token has expired.")
-                    .build();
-        }
-
-        UserEntity user = verificationToken.getUser();
-        user.setActive(true);
-        userRepository.save(user);
-
-        return Response.builder()
-                .status(200)
-                .message("Your account has been verified successfully.")
-                .build();
     }
 
 
