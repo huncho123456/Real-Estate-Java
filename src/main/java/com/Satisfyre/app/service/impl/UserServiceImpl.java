@@ -1,14 +1,11 @@
 package com.Satisfyre.app.service.impl;
 
 import com.Satisfyre.app.config.dotenvConfig;
-import com.Satisfyre.app.dto.LoginRequest;
-import com.Satisfyre.app.dto.RegistrationRequest;
+import com.Satisfyre.app.dto.*;
 import com.Satisfyre.app.exceptions.InvalidCredentialException;
 import com.Satisfyre.app.exceptions.NotFoundException;
 import com.Satisfyre.app.notification.NotificationService;
 import com.Satisfyre.app.service.UserService;
-import com.Satisfyre.app.dto.Response;
-import com.Satisfyre.app.dto.UserDTO;
 import com.Satisfyre.app.entity.UserEntity;
 import com.Satisfyre.app.enums.UserRole;
 import com.Satisfyre.app.repo.UserRepository;
@@ -97,7 +94,6 @@ public class UserServiceImpl implements UserService {
         return Response.builder()
                 .status(200)
                 .referralCode(saved.getReferralCode())
-                .password(registrationRequest.getPassword())
                 .user(userDTO)
                 .message(saved.getEmail() + " Registered successfully. Check your email.")
                 .build();
@@ -247,6 +243,51 @@ public class UserServiceImpl implements UserService {
 
         return all;
     }
+
+    @Override
+    public List<DownlineDTO> getAllDownlinesWithLevels(String referralCode) {
+        List<DownlineDTO> all = new ArrayList<>();
+        Queue<Map.Entry<String, Integer>> queue = new LinkedList<>();
+
+        queue.add(Map.entry(referralCode, 0)); // Start with upline at level 0
+
+        while (!queue.isEmpty()) {
+            Map.Entry<String, Integer> current = queue.poll();
+            String currentReferralCode = current.getKey();
+            int currentLevel = current.getValue();
+
+            List<UserEntity> downlines = userRepository.findAllByReferredBy(currentReferralCode);
+
+            for (UserEntity user : downlines) {
+                int newLevel = currentLevel + 1;
+                all.add(new DownlineDTO(user, newLevel));
+                queue.add(Map.entry(user.getReferralCode(), newLevel));
+            }
+        }
+
+        return all;
+    }
+
+    // ✅ Get only a specific level's downlines
+    @Override
+    public List<UserEntity> getDownlinesByLevel(String referralCode, int targetLevel) {
+        return getAllDownlinesWithLevels(referralCode).stream()
+                .filter(dto -> dto.getLevel() == targetLevel)
+                .map(DownlineDTO::getUser)
+                .toList();
+    }
+
+    // ✅ Group downlines by level
+    @Override
+    public Map<Integer, List<UserEntity>> getDownlinesGroupedByLevel(String referralCode) {
+        return getAllDownlinesWithLevels(referralCode).stream()
+                .collect(Collectors.groupingBy(
+                        DownlineDTO::getLevel,
+                        Collectors.mapping(DownlineDTO::getUser, Collectors.toList())
+                ));
+    }
+
+
 
     @Override
     public Response getMyBookingHistory() {

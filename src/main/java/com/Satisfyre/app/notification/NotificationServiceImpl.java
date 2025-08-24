@@ -30,6 +30,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final JavaMailSender javaMailSender;
     private final NotificationRepository notificationRepository;
     String FRONT_ENDPOINT = dotenvConfig.get("FRONTEND_BASEURL");
+    String BaseUrl = dotenvConfig.get("BASEURL");
 
     @Async
     @Override
@@ -38,7 +39,7 @@ public class NotificationServiceImpl implements NotificationService {
         BufferedReader reader = null;
 
         try {
-            // 1️⃣ Fetch HTML template from frontend
+
             URL url = new URL(FRONT_ENDPOINT + "/src/frontend/html/email.html");
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
@@ -54,13 +55,16 @@ public class NotificationServiceImpl implements NotificationService {
             reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
             String rawHtml = reader.lines().collect(Collectors.joining("\n"));
 
+            String referralLink = BaseUrl + "/api/auth/register?ref=" + consultantId;
             // 2️⃣ Replace placeholders in HTML template
             String processedHtml = rawHtml
                     .replace("{{fullName}}", escapeHtml(fullName))
                     .replace("{{email}}", escapeHtml(email))
                     .replace("{{password}}", escapeHtml(password))
                     .replace("{{phoneNumber}}", escapeHtml(phoneNumber))
-                    .replace("{{consultantId}}", escapeHtml(consultantId));
+                    .replace("{{consultantId}}", escapeHtml(consultantId))
+                    .replace("{{link}}", escapeHtml(referralLink));
+
 
 
             // 3️⃣ Send email
