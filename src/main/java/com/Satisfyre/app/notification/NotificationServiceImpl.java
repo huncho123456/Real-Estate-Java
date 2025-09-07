@@ -40,7 +40,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         try {
 
-            URL url = new URL(FRONT_ENDPOINT + "/src/frontend/html/email.html");
+            URL url = new URL(FRONT_ENDPOINT + "/html/email.html");
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setConnectTimeout(5000);

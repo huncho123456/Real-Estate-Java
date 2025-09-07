@@ -112,6 +112,8 @@ public class UserServiceImpl implements UserService {
 
         log.info("INSIDE loginUser() " + loginRequest.getEmail());
 
+        String JWTExpires = "5 Minutes";
+
         UserEntity user = userRepository.findByEmail(loginRequest.getEmail())
                 .orElseThrow(() -> new NotFoundException("Email Not Found"));
 
@@ -127,7 +129,7 @@ public class UserServiceImpl implements UserService {
                 .role(user.getRole())
                 .token(token)
                 .active(user.isActive())
-                .expirationTime("6 month")
+                .expirationTime(JWTExpires)
                 .build();
 
     }

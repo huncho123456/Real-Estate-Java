@@ -66,7 +66,7 @@ public class AuthController {
 
     @GetMapping("/register")
     public ResponseEntity<Void> redirectToFrontend(@RequestParam(required = false) String ref) {
-        String frontendUrl = FRONT_ENDPOINT + "/src/frontend/html/auth-register-basic.html";
+        String frontendUrl = FRONT_ENDPOINT + "/html/auth-register-basic.html";
         String redirectUrl = (ref != null) ? frontendUrl + "?ref=" + ref : frontendUrl;
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(redirectUrl));
