@@ -23,7 +23,8 @@ WORKDIR /app
 # Create a non-root user for security (important for Render)
 RUN groupadd --system javauser && useradd --system --gid javauser javauser
 
-# --- COPY .env FIRST, before changing ownership ---
+# --- CREATE EMPTY .env FILE FIRST ---
+RUN touch .env
 COPY --from=builder /app/build/libs/*.jar app.jar
 COPY .env .env
 
