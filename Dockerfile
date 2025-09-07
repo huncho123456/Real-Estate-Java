@@ -13,7 +13,6 @@ COPY src src
 
 # Make gradlew executable and build the application
 RUN chmod +x gradlew
-# Render will set this environment variable during build
 RUN ./gradlew clean build -x test
 
 # 2. Final runtime stage - use JRE for smaller image
@@ -24,15 +23,13 @@ WORKDIR /app
 # Create a non-root user for security (important for Render)
 RUN groupadd --system javauser && useradd --system --gid javauser javauser
 
-# Copy the built JAR from the builder stage
+# --- COPY .env FIRST, before changing ownership ---
 COPY --from=builder /app/build/libs/*.jar app.jar
+COPY .env .env
 
-# Change ownership to non-root user
+# Change ownership to non-root user (includes the .env file)
 RUN chown -R javauser:javauser /app
 USER javauser
-
-# Add this line before the COPY commands
-COPY .env .env
 
 # Expose the port (Render will use this)
 EXPOSE 8080
