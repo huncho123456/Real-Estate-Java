@@ -31,6 +31,9 @@ COPY --from=builder /app/build/libs/*.jar app.jar
 RUN chown -R javauser:javauser /app
 USER javauser
 
+# Add this line before the COPY commands
+COPY .env .env
+
 # Expose the port (Render will use this)
 EXPOSE 8080
 

@@ -49,7 +49,7 @@ public class UserEntity {
     private String referredBy;
 
     @Column(name = "active")
-    private boolean active = false;
+    private boolean active = true;
 
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate dateOfBirth;
