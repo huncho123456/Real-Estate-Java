@@ -35,7 +35,9 @@ public class SecurityFilter {
                 .cors(Customizer.withDefaults())
                 .exceptionHandling(ex ->
                         ex.accessDeniedHandler(customAccessDenialHandler).authenticationEntryPoint(customAuthenticationEntryPoint))
-                .authorizeHttpRequests(req -> req.requestMatchers("/api/auth/**", "/api/users/**","/login","/api/users/downlines/{referralCode}").permitAll()
+                .authorizeHttpRequests(req -> req.requestMatchers("/api/auth/**", "/api/users/**",
+                                "/login","/referral-link","/register", "/registers",
+                                "/api/users/downlines/{referralCode}").permitAll()
                         .anyRequest().authenticated()).formLogin(form -> form
                         .loginPage("/login")
                         .defaultSuccessUrl("/dashboard", true)

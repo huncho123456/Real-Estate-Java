@@ -1,18 +1,12 @@
 package com.Satisfyre.app.service.impl;
 
-import com.Satisfyre.app.dto.LoginRequest;
-import com.Satisfyre.app.dto.RegistrationRequest;
-import com.Satisfyre.app.enums.EmploymentStatus;
-import com.Satisfyre.app.enums.Gender;
-import com.Satisfyre.app.enums.MartialStatus;
+import com.Satisfyre.app.config.dotenvConfig;
+import com.Satisfyre.app.dto.*;
 import com.Satisfyre.app.exceptions.InvalidCredentialException;
 import com.Satisfyre.app.exceptions.NotFoundException;
 import com.Satisfyre.app.notification.NotificationService;
 import com.Satisfyre.app.service.UserService;
-import com.Satisfyre.app.dto.Response;
-import com.Satisfyre.app.dto.UserDTO;
 import com.Satisfyre.app.entity.UserEntity;
-import com.Satisfyre.app.entity.VerificationTokenEntity;
 import com.Satisfyre.app.enums.UserRole;
 import com.Satisfyre.app.repo.UserRepository;
 import com.Satisfyre.app.security.JwtUtils;
@@ -20,14 +14,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
-import com.Satisfyre.app.repo.verificationTokenRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -37,77 +29,76 @@ import java.util.stream.Collectors;
 @Slf4j
 public class UserServiceImpl implements UserService {
 
+    String BASEURL = dotenvConfig.get("BASEURL");
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
     private final ModelMapper modelMapper;
     private final NotificationService notificationService;
-    @Autowired
-    private final verificationTokenRepository verificationTokenRepository;
-
 
     @Override
     public Response registerUser(RegistrationRequest registrationRequest) {
         log.info("INSIDE registerUser()");
 
-        UserRole role = registrationRequest.getRole() != null ? registrationRequest.getRole() : UserRole.CUSTOMER;
-
         if (userRepository.existsByEmail(registrationRequest.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + registrationRequest.getEmail());
         }
 
+        UserRole role = registrationRequest.getRole() != null ? registrationRequest.getRole() : UserRole.CUSTOMER;
+
+        // Hash the password for storage
+        String hashedPassword = passwordEncoder.encode(registrationRequest.getPassword());
         UserEntity userToSave = UserEntity.builder()
                 .firstName(registrationRequest.getFirstName())
                 .lastName(registrationRequest.getLastName())
                 .email(registrationRequest.getEmail())
-                .password(passwordEncoder.encode(registrationRequest.getPassword()))
+                .password(hashedPassword)
                 .phoneNumber(registrationRequest.getPhoneNumber())
                 .role(role)
-                .active(false)
+                .active(true)
                 .dateOfBirth(registrationRequest.getDateOfBirth())
-                .sex(Gender.valueOf(registrationRequest.getSex()))
-                .maritalStatus(MartialStatus.valueOf(registrationRequest.getMaritalStatus()))
+                .sex(registrationRequest.getSex())
+                .maritalStatus(registrationRequest.getMaritalStatus())
                 .homeAddress(registrationRequest.getHomeAddress())
                 .bankName(registrationRequest.getBankName())
                 .accountNumber(registrationRequest.getAccountNumber())
                 .accountName(registrationRequest.getAccountName())
-                .employmentStatus(EmploymentStatus.valueOf(registrationRequest.getEmploymentStatus()))
+                .employmentStatus(registrationRequest.getEmploymentStatus())
                 .build();
 
+        // Generate and set referral code
         userToSave.setReferralCode(generateReferralCode(registrationRequest.getFirstName()));
 
+        // Optionally set the upline referral if present and valid
         if (registrationRequest.getReferredBy() != null) {
             Optional<UserEntity> upline = userRepository.findByReferralCode(registrationRequest.getReferredBy());
             upline.ifPresent(user -> userToSave.setReferredBy(user.getReferralCode()));
+
         }
 
+        // Save user
+        UserEntity saved = userRepository.save(userToSave);
 
-        userRepository.save(userToSave);
+        UserDTO userDTO = modelMapper.map(saved, UserDTO.class);
 
-        String token = UUID.randomUUID().toString();
-        VerificationTokenEntity verificationToken = VerificationTokenEntity.builder()
-                .token(token)
-                .user(userToSave)
-                .expiryDate(LocalDateTime.now().plusMinutes(5))
-                .build();
+        notificationService.sendWelcomeEmail(
+                saved.getEmail(),
+                saved.getFirstName() + " " + saved.getLastName(),
+                saved.getEmail(),
+                registrationRequest.getPassword(),
+                saved.getPhoneNumber(),
+                saved.getReferralCode()
 
-        verificationTokenRepository.save(verificationToken);
-
-        String verificationLink = "http://localhost:8080/api/auth/verify?token=" + token;
-
-        notificationService.sendVerificationEmail(
-                userToSave.getEmail(),
-                userToSave.getFirstName(),
-                verificationLink
         );
 
         return Response.builder()
                 .status(200)
-                .token(token)
-                .referralCode(userToSave.getReferralCode())
-                .message(registrationRequest.getEmail() + " Registered successfully. Please verify your email.")
+                .referralCode(saved.getReferralCode())
+                .user(userDTO)
+                .message(saved.getEmail() + " Registered successfully. Check your email.")
                 .build();
     }
+
 
     public String getUplineNameByReferralCode(String referralCode) {
         return userRepository.findByReferralCode(referralCode)
@@ -117,40 +108,11 @@ public class UserServiceImpl implements UserService {
 
 
     @Override
-    public Response verifyToken(String token) {
-        Optional<VerificationTokenEntity> optionalToken = verificationTokenRepository.findByToken(token);
-
-        if (optionalToken.isEmpty()) {
-            return Response.builder()
-                    .status(400)
-                    .message("Invalid verification token.")
-                    .build();
-        }
-
-        VerificationTokenEntity verificationToken = optionalToken.get();
-
-        if (verificationToken.getExpiryDate().isBefore(LocalDateTime.now())) {
-            return Response.builder()
-                    .status(400)
-                    .message("Verification token has expired.")
-                    .build();
-        }
-
-        UserEntity user = verificationToken.getUser();
-        user.setActive(true);
-        userRepository.save(user);
-
-        return Response.builder()
-                .status(200)
-                .message("Your account has been verified successfully.")
-                .build();
-    }
-
-
-    @Override
     public Response loginUser(LoginRequest loginRequest) {
 
         log.info("INSIDE loginUser() " + loginRequest.getEmail());
+
+        String JWTExpires = "5 Minutes";
 
         UserEntity user = userRepository.findByEmail(loginRequest.getEmail())
                 .orElseThrow(() -> new NotFoundException("Email Not Found"));
@@ -167,7 +129,7 @@ public class UserServiceImpl implements UserService {
                 .role(user.getRole())
                 .token(token)
                 .active(user.isActive())
-                .expirationTime("6 month")
+                .expirationTime(JWTExpires)
                 .build();
 
     }
@@ -283,6 +245,51 @@ public class UserServiceImpl implements UserService {
 
         return all;
     }
+
+    @Override
+    public List<DownlineDTO> getAllDownlinesWithLevels(String referralCode) {
+        List<DownlineDTO> all = new ArrayList<>();
+        Queue<Map.Entry<String, Integer>> queue = new LinkedList<>();
+
+        queue.add(Map.entry(referralCode, 0)); // Start with upline at level 0
+
+        while (!queue.isEmpty()) {
+            Map.Entry<String, Integer> current = queue.poll();
+            String currentReferralCode = current.getKey();
+            int currentLevel = current.getValue();
+
+            List<UserEntity> downlines = userRepository.findAllByReferredBy(currentReferralCode);
+
+            for (UserEntity user : downlines) {
+                int newLevel = currentLevel + 1;
+                all.add(new DownlineDTO(user, newLevel));
+                queue.add(Map.entry(user.getReferralCode(), newLevel));
+            }
+        }
+
+        return all;
+    }
+
+    // ✅ Get only a specific level's downlines
+    @Override
+    public List<UserEntity> getDownlinesByLevel(String referralCode, int targetLevel) {
+        return getAllDownlinesWithLevels(referralCode).stream()
+                .filter(dto -> dto.getLevel() == targetLevel)
+                .map(DownlineDTO::getUser)
+                .toList();
+    }
+
+    // ✅ Group downlines by level
+    @Override
+    public Map<Integer, List<UserEntity>> getDownlinesGroupedByLevel(String referralCode) {
+        return getAllDownlinesWithLevels(referralCode).stream()
+                .collect(Collectors.groupingBy(
+                        DownlineDTO::getLevel,
+                        Collectors.mapping(DownlineDTO::getUser, Collectors.toList())
+                ));
+    }
+
+
 
     @Override
     public Response getMyBookingHistory() {

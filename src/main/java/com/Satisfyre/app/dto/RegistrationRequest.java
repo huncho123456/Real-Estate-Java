@@ -41,5 +41,5 @@ public class RegistrationRequest {
     private String accountNumber;
     private String accountName;
     private String employmentStatus;
-    private MultipartFile idProof;
+
 }

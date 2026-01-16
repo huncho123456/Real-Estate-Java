@@ -30,6 +30,7 @@ public class Response {
     private String referredBy;
 
     // User data
+    private String password;
     private UserDTO user;
     private List<UserDTO> users;
 
@@ -46,7 +47,6 @@ public class Response {
     private String accountNumber;
     private String accountName;
     private String employmentStatus;
-    private String idProof;
 
     private final LocalDateTime timestamp = LocalDateTime.now();
 }

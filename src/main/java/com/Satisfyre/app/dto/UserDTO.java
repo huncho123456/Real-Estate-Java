@@ -42,7 +42,6 @@ public class UserDTO {
     private String accountName;
     private String employmentStatus;
 
-    private int status;
     private String message;
 
     private UserDTO user;
@@ -61,13 +60,13 @@ public class UserDTO {
                 .referralCode(user.getReferralCode())
                 .referredBy(user.getReferredBy())
                 .dateOfBirth(user.getDateOfBirth())
-                .sex(String.valueOf(user.getSex()))
-                .maritalStatus(String.valueOf(user.getMaritalStatus()))
+                .sex(user.getSex())
+                .maritalStatus(user.getMaritalStatus())
                 .homeAddress(user.getHomeAddress())
                 .bankName(user.getBankName())
                 .accountNumber(user.getAccountNumber())
                 .accountName(user.getAccountName())
-                .employmentStatus(String.valueOf(user.getEmploymentStatus()))
+                .employmentStatus(user.getEmploymentStatus())
                 .build();
     }
 }

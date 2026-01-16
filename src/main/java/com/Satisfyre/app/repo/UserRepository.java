@@ -13,4 +13,6 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     Optional<UserEntity> findByReferralCode(String referralCode);
     List<UserEntity> findAllByReferredBy(String referralCode);
 
+
+
 }
